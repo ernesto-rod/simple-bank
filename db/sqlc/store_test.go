@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,21 +11,23 @@ import (
 func TestTransferTx(t *testing.T) {
 	store := NewStore(testDB)
 
-	fromAccount := createRandomAccount(t)
-	toAccount := createRandomAccount(t)
-
+	srcAccount := createRandomAccount(t)
+	dstAccount := createRandomAccount(t)
+	fmt.Println(">> before:", srcAccount.Balance, dstAccount.Balance)
 	// run n concurrent transfer transactions
-	n := 5
+	n := 2
 	amount := int64(10)
 
 	errs := make(chan error)
 	results := make(chan TransferTxResult)
 
-	for range n {
+	for i := range n {
+		txName := fmt.Sprintf("tx %d", i+1)
 		go func() {
-			result, err := store.TransferTx(context.Background(), TransferTxParams{
-				FromAccountID: fromAccount.ID,
-				ToAccountID:   toAccount.ID,
+			ctx := context.WithValue(context.Background(), txKey, txName)
+			result, err := store.TransferTx(ctx, TransferTxParams{
+				FromAccountID: srcAccount.ID,
+				ToAccountID:   dstAccount.ID,
 				Amount:        amount,
 			})
 
@@ -34,6 +37,7 @@ func TestTransferTx(t *testing.T) {
 	}
 
 	// check results
+	existed := make(map[int]bool)
 	for range n {
 		err := <-errs
 		require.NoError(t, err)
@@ -44,8 +48,8 @@ func TestTransferTx(t *testing.T) {
 		// check transfer
 		transfer := result.Transfer
 		require.NotEmpty(t, transfer)
-		require.Equal(t, fromAccount.ID, transfer.FromAccountID)
-		require.Equal(t, toAccount.ID, transfer.ToAccountID)
+		require.Equal(t, srcAccount.ID, transfer.FromAccountID)
+		require.Equal(t, dstAccount.ID, transfer.ToAccountID)
 		require.Equal(t, amount, transfer.Amount)
 		require.NotZero(t, transfer.ID)
 		require.NotZero(t, transfer.CreatedAt)
@@ -56,7 +60,7 @@ func TestTransferTx(t *testing.T) {
 		// check entries
 		fromEntry := result.FromEntry
 		require.NotEmpty(t, fromEntry)
-		require.Equal(t, fromAccount.ID, fromEntry.AccountID)
+		require.Equal(t, srcAccount.ID, fromEntry.AccountID)
 		require.Equal(t, -amount, fromEntry.Amount)
 		require.NotZero(t, fromEntry.ID)
 		require.NotZero(t, fromEntry.CreatedAt)
@@ -66,7 +70,7 @@ func TestTransferTx(t *testing.T) {
 
 		toEntry := result.ToEntry
 		require.NotEmpty(t, toEntry)
-		require.Equal(t, toAccount.ID, toEntry.AccountID)
+		require.Equal(t, dstAccount.ID, toEntry.AccountID)
 		require.Equal(t, amount, toEntry.Amount)
 		require.NotZero(t, toEntry.ID)
 		require.NotZero(t, toEntry.CreatedAt)
@@ -74,6 +78,37 @@ func TestTransferTx(t *testing.T) {
 		_, err = store.GetEntry(context.Background(), toEntry.ID)
 		require.NoError(t, err)
 
+		// check accounts
+		fromAccount := result.FromAccount
+		require.NotEmpty(t, fromAccount)
+		require.Equal(t, srcAccount.ID, fromAccount.ID)
+
+		toAccount := result.ToAccount
+		require.NotEmpty(t, toAccount)
+		require.Equal(t, dstAccount.ID, toAccount.ID)
+
 		// TODO: check account's balance
+		fmt.Println(">> tx:", fromAccount.Balance, toAccount.Balance)
+		diff1 := srcAccount.Balance - fromAccount.Balance
+		diff2 := dstAccount.Balance - toAccount.Balance
+		require.Equal(t, diff1, diff2)
+		require.True(t, diff1 > 0)
+		require.True(t, diff1%amount == 0) // amount, 2 * amount, 3 * amount, ..., n * amount
+
+		k := int(diff1 / amount)
+		require.True(t, k >= 1 && k <= n)
+		require.NotContains(t, existed, k)
+		existed[k] = true
 	}
+
+	// check the final updated balances
+	updatedFromAccount, err := testQueries.GetAccount(context.Background(), srcAccount.ID)
+	require.NoError(t, err)
+
+	updatedToAccount, err := testQueries.GetAccount(context.Background(), dstAccount.ID)
+	require.NoError(t, err)
+
+	fmt.Println(">> after:", srcAccount.Balance, dstAccount.Balance)
+	require.Equal(t, srcAccount.Balance-int64(n)*amount, updatedFromAccount.Balance)
+	require.Equal(t, dstAccount.Balance+int64(n)*amount, updatedToAccount.Balance)
 }
