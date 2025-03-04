@@ -41,7 +41,7 @@ func TestGetEntry(t *testing.T) {
 	require.Equal(t, createdEntry.ID, retrievedEntry.ID)
 	require.Equal(t, createdEntry.AccountID, retrievedEntry.AccountID)
 	require.Equal(t, createdEntry.Amount, retrievedEntry.Amount)
-	require.WithinDuration(t, createdEntry.CratedAt, retrievedEntry.CratedAt, time.Second)
+	require.WithinDuration(t, createdEntry.CreatedAt, retrievedEntry.CreatedAt, time.Second)
 }
 
 func TestListEntries(t *testing.T) {
