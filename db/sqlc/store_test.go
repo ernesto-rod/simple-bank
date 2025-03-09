@@ -10,21 +10,19 @@ import (
 
 func TestTransferTx(t *testing.T) {
 	store := NewStore(testDB)
-
 	srcAccount := createRandomAccount(t)
 	dstAccount := createRandomAccount(t)
 	fmt.Println(">> before:", srcAccount.Balance, dstAccount.Balance)
 	// run n concurrent transfer transactions
-	n := 2
+	n := 5
 	amount := int64(10)
 
 	errs := make(chan error)
 	results := make(chan TransferTxResult)
 
-	for i := range n {
-		txName := fmt.Sprintf("tx %d", i+1)
+	for range n {
 		go func() {
-			ctx := context.WithValue(context.Background(), txKey, txName)
+			ctx := context.Background()
 			result, err := store.TransferTx(ctx, TransferTxParams{
 				FromAccountID: srcAccount.ID,
 				ToAccountID:   dstAccount.ID,
@@ -87,10 +85,11 @@ func TestTransferTx(t *testing.T) {
 		require.NotEmpty(t, toAccount)
 		require.Equal(t, dstAccount.ID, toAccount.ID)
 
-		// TODO: check account's balance
+		//check account's balance
 		fmt.Println(">> tx:", fromAccount.Balance, toAccount.Balance)
+
 		diff1 := srcAccount.Balance - fromAccount.Balance
-		diff2 := dstAccount.Balance - toAccount.Balance
+		diff2 := toAccount.Balance - dstAccount.Balance
 		require.Equal(t, diff1, diff2)
 		require.True(t, diff1 > 0)
 		require.True(t, diff1%amount == 0) // amount, 2 * amount, 3 * amount, ..., n * amount
