@@ -1,12 +1,12 @@
-version: "2"
-sql:
-  - schema: "./sql/migration"
-    queries: "./sql/queries"
+version: "1"
+packages:
+  - name: "db"
+    path: "./db/sqlc"
+    queries: "./db/query/"
+    schema: "./db/migration/"
     engine: "postgresql"
-    gen:
-      go:
-        out: "db"
-        emit_json_tags: true
-        emit_prepared_queries: false
-        emit_interface: false
-        emit_exact_table_names: false
+    sql_package: "database/sql"
+    emit_json_tags: true
+    emit_prepared_queries: false
+    emit_interface: false
+    emit_exact_table_names: false
