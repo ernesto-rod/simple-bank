@@ -26,3 +26,4 @@ go.work.sum
 .dbenv
 
 docker-compose.mysql.yml
+.air.toml

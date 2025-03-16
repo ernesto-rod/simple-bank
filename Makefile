@@ -22,10 +22,13 @@ migrate_up:
 migrate_down:
 	migrate -path db/migration -database "postgresql://root:tr4nsactD3@localhost:5433/simple_bank?sslmode=disable" -verbose down
 
+server:
+	go run main.go
+
 sqlc:
 	sqlc generate
 
 tests:
 	go test -v -cover ./...
 
-.PHONY: postgres createdb dropdb db_up db_down migrate_up migrate_down
+.PHONY: postgres createdb dropdb db_up db_down migrate_up migrate_down server
